@@ -21,12 +21,18 @@ local MIN_ORDER = 3
 local MAX_ORDER = 100
 -- local MAX_ORDER = 15
 
+local QUANTIZED = 'quantized'
+local INTERPOLATED = 'interpolated'
+local RAW = 'raw'
+
 
 -- ------------------------------------------------------------------------
 -- state
 
 local polygon_order = 5
-offset = 0
+local offset = 0
+
+local order_transition_mode = RAW
 
 
 -- ------------------------------------------------------------------------
@@ -64,8 +70,8 @@ function enc(n, v)
   end
 
   if n == 2 then
-    -- polygon_order = util.clamp(polygon_order + (v/10), MIN_ORDER, MAX_ORDER)
-    polygon_order = util.clamp(polygon_order + sign, MIN_ORDER, MAX_ORDER)
+    polygon_order = util.clamp(polygon_order + (v/10), MIN_ORDER, MAX_ORDER)
+    -- polygon_order = util.clamp(polygon_order + sign, MIN_ORDER, MAX_ORDER)
   elseif n == 3 then
     offset = util.clamp(math.floor(offset + v), 0, 99)
   end
@@ -108,7 +114,25 @@ function redraw()
 
   for sample=0,(NB_SAMPLES-1) do
     local angle = sample/NB_SAMPLES
-    local r = polygonV(angle, polygon_order, offset/100)
+
+    local r
+
+    if order_transition_mode == RAW then
+      r = polygonV(angle, polygon_order, offset/100)
+    else
+      local n = math.floor(polygon_order)
+
+      r = polygonV(angle, n, offset/100)
+
+      if order_transition_mode == INTERPOLATED then
+        local next_amount = polygon_order % 1
+        if next_amount ~= 0 then
+          local r_next = polygonV(angle, n+1, offset/100)
+          r = util.linlin(0, 1, r, r_next, next_amount)
+        end
+      end
+    end
+
     -- local x = r * cos1(2*math.pi * angle) * ZOOM_FACTOR / polygon_order + (SCREEN_W/2)
     -- local y = r * sin1(2*math.pi * angle) * ZOOM_FACTOR / polygon_order + (SCREEN_H/2)
     local x = r * cos1(2*math.pi * angle) * ZOOM_FACTOR + (SCREEN_W/2)
